@@ -1,26 +1,26 @@
 # CLAUDE.md
 
-This file provides guidance for AI assistants (Claude Code and similar tools) working in this repository.
+このファイルは、このリポジトリで作業するAIアシスタント（Claude Codeなど）向けのガイドラインです。
 
-## Repository Overview
+## リポジトリ概要
 
-- **Repository**: nobu-jp/nobu_claude
-- **Status**: Newly initialized — no source code has been committed yet.
-- **Primary branch**: `main` (or as configured by the project owner)
+- **リポジトリ**: nobu-jp/nobu_claude
+- **ステータス**: 新規作成 — まだソースコードはコミットされていません
+- **メインブランチ**: `main`（またはプロジェクトオーナーが設定したブランチ）
 
-> When source code is added, update this file to reflect the actual project purpose, tech stack, and structure.
+> ソースコードが追加されたら、実際のプロジェクトの目的・技術スタック・構成を反映してこのファイルを更新してください。
 
-## Git Workflow
+## Gitワークフロー
 
-### Branch Naming
+### ブランチ命名規則
 
-- Feature branches created by Claude must follow the pattern: `claude/<description>-<session-id>`
-  - Example: `claude/add-claude-documentation-Tg7np`
-- Human-led feature branches: `feature/<description>` or `<author>/<description>`
+- Claudeが作成するブランチは必ず `claude/<説明>-<セッションID>` の形式に従うこと
+  - 例: `claude/add-claude-documentation-Tg7np`
+- 人間が作成するフィーチャーブランチ: `feature/<説明>` または `<作者>/<説明>`
 
-### Commit Conventions
+### コミットメッセージの規則
 
-Write clear, imperative commit messages:
+明確で命令形のコミットメッセージを書くこと:
 
 ```
 Add CLAUDE.md with initial repository documentation
@@ -28,36 +28,36 @@ Fix authentication bug in login flow
 Update dependencies to latest versions
 ```
 
-- Keep the subject line under 72 characters
-- Use present tense ("Add" not "Added")
-- Reference issue numbers when applicable: `Fix login bug (#42)`
+- 件名は72文字以内に収める
+- 現在形を使う（"Added" ではなく "Add"）
+- 関連するIssue番号があれば参照する: `Fix login bug (#42)`
 
-### Push Workflow
+### プッシュの手順
 
 ```bash
-# Always set upstream on first push
-git push -u origin <branch-name>
+# 初回プッシュ時は必ずアップストリームを設定する
+git push -u origin <ブランチ名>
 ```
 
-- **Never force-push to `main`/`master`**
-- If a push fails due to network errors, retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s)
+- **`main`/`master` へのフォースプッシュは絶対に禁止**
+- ネットワークエラーでプッシュが失敗した場合は、指数バックオフ（2秒、4秒、8秒、16秒）で最大4回リトライする
 
-## Development Setup
+## 開発環境セットアップ
 
-> This section should be populated once the project is initialized with source code.
+> ソースコードが追加された後に記載してください。
 
-Typical setup steps will include:
+一般的なセットアップ手順:
 
-1. Clone the repository
-2. Install dependencies (e.g., `npm install`, `pip install -r requirements.txt`, etc.)
-3. Copy environment config: `cp .env.example .env` and fill in values
-4. Run the development server or build
+1. リポジトリをクローン
+2. 依存関係をインストール（例: `npm install`、`pip install -r requirements.txt` など）
+3. 環境設定をコピー: `cp .env.example .env` して値を記入
+4. 開発サーバーまたはビルドを実行
 
-## Testing
+## テスト
 
-> Populate once tests are configured.
+> テストが設定されたら記載してください。
 
-Run tests before committing. Common commands:
+コミット前にテストを実行すること。主なコマンド:
 
 ```bash
 # JavaScript/TypeScript
@@ -72,51 +72,51 @@ python -m pytest tests/
 go test ./...
 ```
 
-## Code Style & Linting
+## コードスタイルとリント
 
-> Populate once linters/formatters are configured.
+> リンター・フォーマッターが設定されたら記載してください。
 
-Always run the linter and formatter before committing:
+コミット前に必ずリンターとフォーマッターを実行すること:
 
 ```bash
-# JavaScript/TypeScript (common)
+# JavaScript/TypeScript（一般的）
 npm run lint
 npm run format
 
-# Python (common)
+# Python（一般的）
 ruff check .
 black .
 ```
 
-## Project Structure
+## プロジェクト構成
 
-> Update this section once source code is added.
+> ソースコードが追加されたら更新してください。
 
 ```
 nobu_claude/
-├── CLAUDE.md          # This file
-├── README.md          # Human-facing documentation (add when project is set up)
-├── .gitignore         # Add appropriate ignores for the chosen tech stack
-└── src/               # Source code (to be created)
+├── CLAUDE.md          # このファイル
+├── README.md          # 人間向けドキュメント（プロジェクト設定時に追加）
+├── .gitignore         # 使用する技術スタックに合わせた除外設定
+└── src/               # ソースコード（作成予定）
 ```
 
-## Key Conventions for AI Assistants
+## AIアシスタント向け重要規則
 
-1. **Read before editing** — Always read a file before modifying it.
-2. **Minimal changes** — Only change what is necessary to complete the task. Avoid refactoring unrelated code.
-3. **No secrets in code** — Never commit API keys, passwords, or tokens. Use environment variables.
-4. **Confirm destructive actions** — Ask before deleting files, dropping data, or force-pushing.
-5. **Update this file** — When the project structure or workflows change, update CLAUDE.md to reflect reality.
-6. **Security first** — Avoid introducing OWASP Top 10 vulnerabilities (SQL injection, XSS, command injection, etc.).
+1. **編集前に必ず読む** — ファイルを変更する前に必ず内容を確認する
+2. **最小限の変更** — タスクに必要な変更のみ行い、無関係なコードのリファクタリングは避ける
+3. **シークレットをコードに含めない** — APIキー・パスワード・トークンは絶対にコミットしない。環境変数を使用する
+4. **破壊的な操作は確認を取る** — ファイル削除・データ削除・フォースプッシュの前に必ず確認する
+5. **このファイルを最新に保つ** — プロジェクト構成やワークフローが変わったら CLAUDE.md を更新する
+6. **セキュリティ最優先** — OWASP Top 10の脆弱性（SQLインジェクション、XSS、コマンドインジェクションなど）を混入させない
 
-## Environment Variables
+## 環境変数
 
-> Document required environment variables here once the project is set up.
+> プロジェクトが設定されたら必要な環境変数をここに記載してください。
 
 ```
-# Example
+# 例
 DATABASE_URL=postgres://user:password@localhost:5432/dbname
 API_KEY=your_api_key_here
 ```
 
-Never commit `.env` files. Use `.env.example` as a template with placeholder values.
+`.env` ファイルは絶対にコミットしないこと。`.env.example` をプレースホルダー値のテンプレートとして使用する。
