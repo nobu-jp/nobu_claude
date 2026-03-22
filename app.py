@@ -71,7 +71,7 @@ def get_claude_response(user_id: str, user_message: str) -> str:
 
     try:
         response = claude.messages.create(
-            model="claude-opus-4-6",
+            model="claude-sonnet-4-6",
             max_tokens=1024,
             system=SYSTEM_PROMPT,
             messages=list(history),
