@@ -1,5 +1,4 @@
 import os
-import base64
 import logging
 from collections import defaultdict, deque
 from flask import Flask, request, abort
@@ -9,14 +8,12 @@ from linebot.v3.messaging import (
     Configuration,
     ApiClient,
     MessagingApi,
-    MessagingApiBlob,
     ReplyMessageRequest,
     TextMessage,
 )
 from linebot.v3.webhooks import (
     MessageEvent,
     TextMessageContent,
-    ImageMessageContent,
 )
 import anthropic
 
@@ -108,17 +105,6 @@ def webhook():
     return "OK"
 
 
-def reply_to_line(reply_token: str, text: str) -> None:
-    """LINE にテキストメッセージを返信する共通処理。"""
-    with ApiClient(line_config) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text=text)],
-            )
-        )
-
-
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event: MessageEvent):
     """テキストメッセージを受け取り、Claude の返答を LINE に送信する。"""
@@ -127,56 +113,15 @@ def handle_message(event: MessageEvent):
     logger.info("user_id=%s message=%s", user_id, user_message)
 
     reply_text = get_claude_response(user_id, user_message)
-    reply_to_line(event.reply_token, reply_text)
 
-
-@handler.add(MessageEvent, message=ImageMessageContent)
-def handle_image(event: MessageEvent):
-    """画像メッセージを受け取り、Claude Vision で分析して返信する。"""
-    user_id = event.source.user_id
-    message_id = event.message.id
-    logger.info("user_id=%s image_message_id=%s", user_id, message_id)
-
-    try:
-        # LINE から画像バイナリを取得
-        with ApiClient(line_config) as api_client:
-            blob_api = MessagingApiBlob(api_client)
-            image_bytes = blob_api.get_message_content(message_id)
-
-        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-        # Claude Vision で画像を分析（会話履歴には含めず単発で処理）
-        response = claude.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": image_b64,
-                            },
-                        },
-                        {"type": "text", "text": "この画像について教えてください。"},
-                    ],
-                }
-            ],
+    with ApiClient(line_config) as api_client:
+        line_api = MessagingApi(api_client)
+        line_api.reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)],
+            )
         )
-        reply_text = response.content[0].text
-
-    except anthropic.APIError as e:
-        logger.error("Claude Vision API error: %s", e)
-        reply_text = "画像の分析中にエラーが発生しました。しばらくしてからもう一度お試しください。"
-    except Exception as e:
-        logger.error("Image handling error: %s", e)
-        reply_text = "画像の取得中にエラーが発生しました。"
-
-    reply_to_line(event.reply_token, reply_text)
 
 
 # ── ヘルスチェック ────────────────────────────────────────
