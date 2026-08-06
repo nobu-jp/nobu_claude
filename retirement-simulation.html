@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>積立 → 取り崩しシミュレーション</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Hiragino Kaku Gothic ProN","Yu Gothic",Arial,sans-serif; background:#f1efe8; margin:0; padding:24px; color:#2c2c2a; }
+  .wrap { max-width: 900px; margin:0 auto; }
+  h1 { font-size:20px; font-weight:600; margin:0 0 4px; }
+  .sub { font-size:13px; color:#888780; margin-bottom:20px; }
+  .note { font-size:12px; color:#a8a69f; margin-bottom:20px; line-height:1.7; }
+  .grid4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:#fff; border-radius:12px; padding:1rem; border:1px solid #e1e0d9; }
+  .card .label { font-size:12px; color:#888780; margin-bottom:6px; }
+  .card .value { font-size:19px; font-weight:500; }
+  .card .csub { font-size:11px; color:#a8a69f; margin-top:4px; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:0 0 1.5rem; }
+  .ctl-label { display:flex; justify-content:space-between; font-size:13px; color:#888780; margin-bottom:4px; gap:8px; }
+  .ctl-label span:last-child { color:#2c2c2a; font-weight:500; white-space:nowrap; }
+  input[type=range] { width:100%; }
+  select { width:100%; padding:5px 6px; font-size:13px; border:1px solid #d6d5cd; border-radius:6px; background:#fff; color:#2c2c2a; font-family:inherit; }
+  .results { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:1rem; }
+  .result-card { background:#fff; border-radius:12px; padding:1rem; border:1px solid #e1e0d9; }
+  .result-card .rlabel { font-size:13px; color:#888780; margin-bottom:6px; }
+  .result-card .rvalue { font-size:22px; font-weight:500; }
+  .result-card .rsub { font-size:12px; color:#a8a69f; margin-top:4px; line-height:1.5; }
+  .warn { background:#fdf6ec; border:1px solid #e8d9bd; border-radius:12px; padding:12px 14px; margin-bottom:1.5rem; font-size:12px; line-height:1.7; color:#7a5a26; }
+  .warn:empty { display:none; }
+  .warn b { font-weight:600; }
+  .legend { display:flex; gap:16px; font-size:12px; color:#5f5e5a; margin-bottom:8px; flex-wrap:wrap; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .sw { width:10px; height:10px; border-radius:2px; display:inline-block; }
+  .chart-wrap { position:relative; width:100%; height:300px; margin-bottom:8px; }
+  .fallback-note { font-size:11px; color:#a8a69f; margin-bottom:1.5rem; min-height:1px; }
+  .ok { color:#0f6e56; }
+  .bad { color:#993c1d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="h-title">積立 → 取り崩しシミュレーション</h1>
+  <div class="sub" id="h-sub">証券口座1,345万円は配当再投資なし・iDeCo300万円</div>
+
+  <div class="grid4">
+    <div class="card"><div class="label">証券口座（値上がり＋追加投資）</div><div class="value" id="d-stockval">—</div><div class="csub" id="s-stockval"></div></div>
+    <div class="card"><div class="label">iDeCo（拠出＋運用益で複利）</div><div class="value" id="d-idecoval">—</div><div class="csub" id="s-idecoval"></div></div>
+    <div class="card"><div class="label">取り崩し開始時の資産額（合計）</div><div class="value" id="d-startval">—</div><div class="csub" id="s-startval"></div></div>
+    <div class="card"><div class="label">積立期間中の受取配当（税引後・累計）</div><div class="value" id="d-cumdiv">—</div><div class="csub" id="s-cumdiv"></div></div>
+  </div>
+
+  <div class="controls">
+    <div>
+      <div class="ctl-label"><span>現在の年齢</span><span id="o-age">45歳</span></div>
+      <input type="range" id="age" min="25" max="70" step="1" value="45">
+    </div>
+    <div>
+      <div class="ctl-label"><span>積立期間（取り崩し開始まで）</span><span id="o-n">20年</span></div>
+      <input type="range" id="n" min="0" max="35" step="1" value="20">
+    </div>
+    <div>
+      <div class="ctl-label"><span>配当利回り</span><span id="o-d">3.2%</span></div>
+      <input type="range" id="d" min="0" max="7" step="0.1" value="3.2">
+    </div>
+    <div>
+      <div class="ctl-label"><span>株価の成長率</span><span id="o-g">2%</span></div>
+      <input type="range" id="g" min="-2" max="8" step="0.1" value="2">
+    </div>
+    <div>
+      <div class="ctl-label"><span>取り崩し方針</span><span></span></div>
+      <select id="mode">
+        <option value="max" selected>生活費が足りなければ多く取り崩す</option>
+        <option value="fixed">定額（開始時資産×取り崩し率）</option>
+        <option value="need">生活費の不足分だけ取り崩す</option>
+      </select>
+    </div>
+    <div>
+      <div class="ctl-label"><span>取り崩し率（定額分）</span><span id="o-wr">4.0%</span></div>
+      <input type="range" id="wr" min="2" max="7" step="0.1" value="4.0">
+    </div>
+    <div>
+      <div class="ctl-label"><span>証券口座 年間追加投資</span><span id="o-as">0万円</span></div>
+      <input type="range" id="as" min="0" max="360" step="10" value="0">
+    </div>
+    <div>
+      <div class="ctl-label"><span>iDeCo 年間積立額</span><span id="o-ic">14.4万円</span></div>
+      <input type="range" id="ic" min="0" max="81.6" step="1.2" value="14.4">
+    </div>
+    <div>
+      <div class="ctl-label"><span>年金受給額（年間・税引後）</span><span id="o-p">80万円</span></div>
+      <input type="range" id="p" min="0" max="280" step="10" value="80">
+    </div>
+    <div>
+      <div class="ctl-label"><span>年金受給開始年齢</span><span id="o-pa">65歳</span></div>
+      <input type="range" id="pa" min="60" max="75" step="1" value="65">
+    </div>
+    <div>
+      <div class="ctl-label"><span>生活費目標（年間・税引後）</span><span id="o-l">300万円</span></div>
+      <input type="range" id="l" min="100" max="600" step="10" value="300">
+    </div>
+    <div>
+      <div class="ctl-label"><span>配当・売却益への税率</span><span id="o-t">20.315%</span></div>
+      <input type="range" id="t" min="0" max="25" step="0.005" value="20.315">
+    </div>
+  </div>
+
+  <div class="results">
+    <div class="result-card"><div class="rlabel">資産が尽きるまで</div><div class="rvalue" id="r-years">—</div><div class="rsub" id="s-years"></div></div>
+    <div class="result-card"><div class="rlabel">年金＋取り崩し（税引後・初年度）</div><div class="rvalue" id="r-income">—</div><div class="rsub" id="s-income"></div></div>
+    <div class="result-card"><div class="rlabel">生活費目標との差（初年度）</div><div class="rvalue" id="r-gap">—</div><div class="rsub" id="s-gap"></div></div>
+  </div>
+
+  <div class="warn" id="warn"></div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:#2a78d6"></span>積立期</span>
+    <span><span class="sw" style="background:#eb6834"></span>取り崩し期</span>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="ch" role="img" aria-label="積立期と取り崩し期をつなげた資産残高の推移">資産残高推移の折れ線グラフ</canvas>
+  </div>
+  <div class="fallback-note" id="chart-note"></div>
+
+  <div class="note" id="notes"></div>
+</div>
+
+<script>
+(function(){
+// ==MODEL-START==
+var V0 = 1345.0;                 // 万円 証券口座の現在残高
+var IDECO0 = 300.0;              // 万円 iDeCoの現在残高
+var IDECO_CONTRIB_END_AGE = 65;  // iDeCo拠出は65歳未満まで
+var IDECO_WITHDRAW_AGE = 60;     // iDeCoの受給開始は60歳から
+var MAX_AGE = 120;               // シミュレーション上限年齢
+
+// 純粋関数。DOMには一切触れない（テストから直接呼べるようにするため）
+function calc(p){
+  var R = p.D + p.G;             // トータルリターン
+  var stock = V0;
+  var stockBasis = V0;           // 証券口座の取得原価（売却益課税の計算に使う）
+  var ideco = IDECO0;
+  var cumDivNet = 0, lastDivNet = 0;
+  var idecoContribStopped = false;
+
+  var labels = [0], bal = [V0 + IDECO0], phase = [0], ages = [p.age0];
+
+  // ---- 積立期 ----
+  for (var i = 1; i <= p.N; i++){
+    var ageAtStart = p.age0 + i - 1;
+    var divNet = stock * p.D * (1 - p.T);   // 配当は再投資せず、税引後を受け取る
+    cumDivNet += divNet;
+    lastDivNet = divNet;
+
+    stock = stock * (1 + p.G) + p.AS;       // 値上がり分＋追加投資のみで増える
+    stockBasis += p.AS;
+
+    var ic = (ageAtStart < IDECO_CONTRIB_END_AGE) ? p.IC : 0;
+    if (ic === 0 && p.IC > 0) idecoContribStopped = true;
+    ideco = ideco * (1 + R) + ic;           // iDeCoは非課税で複利継続
+
+    labels.push(i); bal.push(stock + ideco); phase.push(0); ages.push(p.age0 + i);
+  }
+
+  var startAge = p.age0 + p.N;
+  var startVal = stock + ideco;
+  var stockStartVal = stock, idecoStartVal = ideco;
+  var Wfixed = startVal * p.WR;             // 定額取り崩し額（税引前）
+
+  // ---- 取り崩し期 ----
+  var depletedYear = null, depletedAge = null;
+  var shortfallYears = 0, lockedYears = 0, everDeclined = false;
+  var first = null, firstWithPension = null;
+  var finalBal = startVal;
+  var maxYears = Math.max(0, MAX_AGE - startAge + 1);
+
+  for (var k = 1; k <= maxYears; k++){
+    var age = startAge + k - 1;
+
+    stock = stock * (1 + R);                // 取り崩し期は配当も再投資して運用継続
+    ideco = ideco * (1 + R);
+
+    var idecoAvail = age >= IDECO_WITHDRAW_AGE;
+    var pot = stock + (idecoAvail ? ideco : 0);
+    if (!idecoAvail && ideco > 0) lockedYears++;
+
+    var pension = (age >= p.PA) ? p.P : 0;
+
+    // 取り崩し1万円あたりの税負担（証券口座の含み益部分にのみ課税）
+    var gainRatio = stock > 0 ? Math.max(0, (stock - stockBasis) / stock) : 0;
+    var stockShare = pot > 0 ? stock / pot : 0;
+    var effTax = stockShare * gainRatio * p.T;
+
+    var need = Math.max(0, p.L - pension);
+    var Wneed = effTax < 0.99 ? need / (1 - effTax) : need;
+
+    var W;
+    if (p.mode === 'fixed')      W = Wfixed;
+    else if (p.mode === 'need')  W = Wneed;
+    else                         W = Math.max(Wfixed, Wneed);
+    if (W > pot) W = pot;
+    if (W < 0) W = 0;
+
+    var fromStock = W * stockShare;
+    var fromIdeco = W - fromStock;
+    var tax = fromStock * gainRatio * p.T;
+    var net = pension + W - tax;
+
+    if (stock > 0) stockBasis *= (1 - fromStock / stock);
+    stock -= fromStock;
+    ideco -= fromIdeco;
+    if (stock < 0) stock = 0;
+    if (ideco < 0) ideco = 0;
+
+    if (net < p.L - 0.5) shortfallYears++;
+
+    var row = {age:age, pension:pension, gross:W, tax:tax, net:net, idecoAvail:idecoAvail};
+    if (k === 1) first = row;
+    if (firstWithPension === null && pension > 0) firstWithPension = row;
+
+    var prevBal = bal[bal.length - 1];
+    finalBal = stock + ideco;
+    if (finalBal < prevBal - 1e-9) everDeclined = true;   // 一度でも減れば「尽きない」とは言わない
+    labels.push(p.N + k); bal.push(Math.max(finalBal, 0)); phase.push(1); ages.push(age + 1);
+
+    if (finalBal <= 0.001){
+      depletedYear = k; depletedAge = age; finalBal = 0;
+      break;
+    }
+  }
+
+  return {
+    labels:labels, bal:bal, phase:phase, ages:ages,
+    N:p.N, R:R, startAge:startAge, startVal:startVal,
+    stockStartVal:stockStartVal, idecoStartVal:idecoStartVal,
+    cumDivNet:cumDivNet, lastDivNet:lastDivNet, idecoContribStopped:idecoContribStopped,
+    Wfixed:Wfixed, first:first, firstWithPension:firstWithPension,
+    depletedYear:depletedYear, depletedAge:depletedAge, everDeclined:everDeclined,
+    shortfallYears:shortfallYears, lockedYears:lockedYears, finalBal:finalBal
+  };
+}
+// ==MODEL-END==
+
+  var ids = ['age','n','d','g','wr','as','ic','p','pa','l','t'];
+  var chart = null;
+
+  function num(id){ return +document.getElementById(id).value; }
+
+  function readParams(){
+    return {
+      age0: num('age'), N: num('n'),
+      D: num('d')/100, G: num('g')/100, WR: num('wr')/100, T: num('t')/100,
+      AS: num('as'), IC: num('ic'), P: num('p'), PA: num('pa'), L: num('l'),
+      mode: document.getElementById('mode').value
+    };
+  }
+
+  function pct(v){ return (+v.toFixed(3)).toString(); }   // 20.315 → "20.315" / 20 → "20"
+
+  function yen(v){
+    if (Math.round(Math.abs(v)) >= 10000) return (v/10000).toFixed(2) + '億円';
+    return Math.round(v).toLocaleString() + '万円';
+  }
+
+  function render(){
+    var p = readParams();
+
+    document.getElementById('o-age').textContent = p.age0 + '歳';
+    document.getElementById('o-n').textContent = p.N + '年';
+    document.getElementById('o-d').textContent = num('d') + '%';
+    document.getElementById('o-g').textContent = num('g') + '%';
+    document.getElementById('o-wr').textContent = num('wr').toFixed(1) + '%';
+    document.getElementById('o-as').textContent = p.AS + '万円';
+    document.getElementById('o-ic').textContent = p.IC.toFixed(1) + '万円';
+    document.getElementById('o-p').textContent = p.P + '万円';
+    document.getElementById('o-pa').textContent = p.PA + '歳';
+    document.getElementById('o-l').textContent = p.L + '万円';
+    document.getElementById('o-t').textContent = pct(num('t')) + '%';
+
+    var r = calc(p);
+
+    document.getElementById('h-title').textContent =
+      '積立' + p.N + '年（' + r.startAge + '歳）→ 取り崩しシミュレーション';
+    document.getElementById('h-sub').textContent =
+      '証券口座1,345万円は配当再投資なし' +
+      (p.AS > 0 ? '・年' + p.AS + '万円を追加投資' : '') +
+      '／iDeCo300万円は年' + p.IC.toFixed(1) + '万円を拠出継続';
+
+    document.getElementById('d-stockval').textContent = yen(r.stockStartVal);
+    document.getElementById('s-stockval').textContent = '成長率' + num('g') + '%で複利' + (p.AS > 0 ? '＋追加投資' : '');
+    document.getElementById('d-idecoval').textContent = yen(r.idecoStartVal);
+    document.getElementById('s-idecoval').textContent = 'トータルリターン' + (r.R*100).toFixed(1) + '%で複利';
+    document.getElementById('d-startval').textContent = yen(r.startVal);
+    document.getElementById('s-startval').textContent = r.startAge + '歳時点の合計';
+    document.getElementById('d-cumdiv').textContent = yen(r.cumDivNet);
+    document.getElementById('s-cumdiv').textContent = p.N > 0
+      ? '最終年の受取配当 年' + yen(r.lastDivNet) + '（生活費に充当）'
+      : '積立期間なし';
+
+    // 資産が尽きるまで
+    var eYears = document.getElementById('r-years'), eYearsSub = document.getElementById('s-years');
+    if (r.depletedYear === null && !r.everDeclined){
+      eYears.textContent = '尽きない';
+      eYears.className = 'rvalue ok';
+      eYearsSub.textContent = '運用益が取り崩し額を上回り、資産は減りません（' + MAX_AGE + '歳時点で ' + yen(r.finalBal) + '）';
+    } else if (r.depletedYear === null){
+      eYears.textContent = MAX_AGE + '歳まで持つ';
+      eYears.className = 'rvalue ok';
+      eYearsSub.textContent = '資産は毎年減っていますが、' + MAX_AGE + '歳時点でまだ ' + yen(r.finalBal) + ' 残る計算です';
+    } else {
+      eYears.textContent = r.depletedYear + '年';
+      eYears.className = 'rvalue bad';
+      eYearsSub.textContent = '取り崩し開始から' + r.depletedYear + '年後、' + r.depletedAge + '歳で枯渇します';
+    }
+
+    // 年金＋取り崩し（初年度・税引後）
+    var f = r.first;
+    if (f){
+      document.getElementById('r-income').textContent = yen(f.net);
+      var parts = '内訳: 年金 ' + yen(f.pension) + ' ＋ 取り崩し ' + yen(f.gross)
+                + (f.tax > 0.5 ? '（うち税 ' + yen(f.tax) + '）' : '');
+      if (r.firstWithPension && r.firstWithPension !== f){
+        parts += ' ／ ' + p.PA + '歳以降は 年' + yen(r.firstWithPension.net);
+      }
+      document.getElementById('s-income').textContent = parts;
+
+      var gap = f.net - p.L;
+      document.getElementById('r-gap').textContent =
+        Math.abs(gap) < 0.5 ? '±0万円' : (gap > 0 ? '+' : '') + yen(gap);
+      document.getElementById('r-gap').className = 'rvalue ' + (gap >= 0 ? 'ok' : 'bad');
+      document.getElementById('s-gap').textContent = gap >= -0.5
+        ? '初年度は目標を満たしています'
+        : '初年度から年' + yen(-gap) + '不足します';
+    } else {
+      document.getElementById('r-income').textContent = '—';
+      document.getElementById('s-income').textContent = '取り崩し期間がありません';
+      document.getElementById('r-gap').textContent = '—';
+      document.getElementById('r-gap').className = 'rvalue';
+      document.getElementById('s-gap').textContent = '';
+    }
+
+    // 警告
+    var w = [];
+    if (r.lockedYears > 0){
+      w.push('<b>iDeCoは' + IDECO_WITHDRAW_AGE + '歳まで引き出せません。</b>取り崩し開始が' + r.startAge
+           + '歳のため、最初の' + r.lockedYears + '年間は証券口座だけで取り崩す計算にしています。');
+    }
+    if (r.idecoContribStopped){
+      w.push('iDeCoの拠出は<b>' + IDECO_CONTRIB_END_AGE + '歳未満まで</b>として計算しています（それ以降は運用のみ）。');
+    }
+    if (r.shortfallYears > 0){
+      w.push('<b>生活費目標に届かない年が' + r.shortfallYears + '年あります。</b>'
+           + (p.mode === 'fixed'
+              ? '「定額」方針のため、不足しても取り崩し額は増やしていません。'
+              : '資産が足りず、必要額を取り崩せていません。'));
+    }
+    if (p.PA > r.startAge){
+      w.push('取り崩し開始（' + r.startAge + '歳）から年金開始（' + p.PA + '歳）までの'
+           + (p.PA - r.startAge) + '年間は、年金なしで資産だけを取り崩します。');
+    }
+    document.getElementById('warn').innerHTML = w.length ? w.join('<br>') : '';
+
+    // 注記
+    document.getElementById('notes').innerHTML = [
+      '・積立期の生活費と追加投資は勤労収入で賄う前提です。証券口座の配当（税引後）はその年に使い切る想定で、資産には積み上げていません',
+      '・iDeCoは分配金が自動再投資され運用益も非課税のため、配当利回り＋成長率のトータルリターン（' + (r.R*100).toFixed(1) + '%）で複利運用します',
+      '・取り崩し期は証券口座も配当を再投資したうえで、両口座から残高比で取り崩します（' + IDECO_WITHDRAW_AGE + '歳未満の期間はiDeCoを除外）',
+      '・証券口座の取り崩しは<b>含み益の割合にのみ' + num('t').toFixed(3) + '%課税</b>し、税引後の手取りを収入としています。iDeCoの受取は退職所得控除・公的年金等控除が使えるため、ここでは非課税として扱っています（実際の税額は受取方法で変わります）',
+      '・年金額・生活費目標は税引後（手取り）の金額として扱っています。年金は公的年金等控除により低額であれば概ね非課税です',
+      '・インフレ調整はしていません。すべて現在の物価水準での金額です（本来の「4%ルール」は毎年インフレ率だけ取り崩し額を増やす手法で、本ツールの定額取り崩しとは異なります）',
+      '・年金額・生活費はあくまで仮の数字です。ねんきん定期便の見込み額や実際の生活費に置き換えて調整してください'
+    ].join('<br>');
+
+    // グラフ（Chart.jsを読み込めない環境では自前描画にフォールバック）
+    if (typeof Chart === 'undefined'){
+      document.getElementById('chart-note').textContent =
+        'グラフライブラリを読み込めなかったため簡易表示にしています（ツールチップは使えません）';
+      drawFallback(r);
+      return;
+    }
+    document.getElementById('chart-note').textContent = '';
+
+    var accData = r.bal.map(function(v,i){ return r.phase[i] === 0 ? v : null; });
+    var wdData  = r.bal.map(function(v,i){ return r.phase[i] === 1 ? v : null; });
+    if (wdData[r.N] === null) wdData[r.N] = r.bal[r.N];   // 境界で2本の線をつなぐ
+
+    if (chart){
+      chart.data.labels = r.labels;
+      chart.data.datasets[0].data = accData;
+      chart.data.datasets[1].data = wdData;
+      chart.$ages = r.ages;
+      chart.update('none');
+      return;
+    }
+
+    chart = new Chart(document.getElementById('ch'), {
+      type:'line',
+      data:{labels:r.labels, datasets:[
+        {label:'積立期', data:accData, borderColor:'#2a78d6', backgroundColor:'rgba(42,120,214,0.08)', fill:true, borderWidth:2, pointRadius:0, tension:0.1, spanGaps:false},
+        {label:'取り崩し期', data:wdData, borderColor:'#eb6834', backgroundColor:'rgba(235,104,52,0.08)', fill:true, borderWidth:2, pointRadius:0, tension:0.1, spanGaps:false}
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            title:function(t){
+              var ages = chart.$ages || [];
+              var a = ages[t[0].dataIndex];
+              return t[0].label + '年後' + (a != null ? '（' + a + '歳）' : '');
+            },
+            label:function(t){
+              if (t.raw == null) return '';
+              return (t.datasetIndex === 0 ? '積立期' : '取り崩し期') + ': ' + yen(t.raw);
+            }
+          }}
+        },
+        scales:{
+          x:{title:{display:true,text:'経過年数（現在から）',color:'#898781',font:{size:11}}, grid:{display:false}, ticks:{color:'#898781',font:{size:11},maxTicksLimit:12}},
+          y:{grid:{color:'rgba(137,135,129,0.2)'}, ticks:{color:'#898781',font:{size:11},callback:function(v){return v>=10000?(v/10000)+'億':v+'万';}}, min:0}
+        }
+      }
+    });
+    chart.$ages = r.ages;
+  }
+
+  function drawFallback(r){
+    var cv = document.getElementById('ch');
+    var W = cv.parentNode.clientWidth, H = cv.parentNode.clientHeight;
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    var g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+
+    var padL = 54, padR = 10, padT = 10, padB = 34;
+    var peak = Math.max.apply(null, r.bal) || 1;
+    var mag = Math.pow(10, Math.floor(Math.log(peak / 4) / Math.LN10));
+    var tick = Math.ceil(peak / 4 / mag) * mag;      // 目盛りをキリのよい値に丸める
+    var maxV = tick * 4;
+    var n = r.bal.length - 1;
+    var X = function(i){ return padL + (W - padL - padR) * (n ? i / n : 0); };
+    var Y = function(v){ return H - padB - (H - padT - padB) * (v / maxV); };
+
+    g.font = '11px sans-serif';
+    g.strokeStyle = 'rgba(137,135,129,0.2)';
+    g.fillStyle = '#898781';
+    g.textAlign = 'right';
+    for (var t = 0; t <= 4; t++){
+      var v = maxV * t / 4, yy = Y(v);
+      g.beginPath(); g.moveTo(padL, yy); g.lineTo(W - padR, yy); g.stroke();
+      g.fillText(v >= 10000 ? (v/10000).toFixed(1) + '億' : Math.round(v) + '万', padL - 6, yy + 4);
+    }
+
+    function series(from, to, stroke, fill){
+      if (to <= from) return;
+      g.beginPath();
+      g.moveTo(X(from), Y(r.bal[from]));
+      for (var i = from + 1; i <= to; i++) g.lineTo(X(i), Y(r.bal[i]));
+      g.strokeStyle = stroke; g.lineWidth = 2; g.stroke();
+      g.lineTo(X(to), Y(0)); g.lineTo(X(from), Y(0)); g.closePath();
+      g.fillStyle = fill; g.fill();
+    }
+    series(0, r.N, '#2a78d6', 'rgba(42,120,214,0.08)');
+    series(r.N, n, '#eb6834', 'rgba(235,104,52,0.08)');
+
+    g.textAlign = 'center'; g.fillStyle = '#898781';
+    var step = Math.max(5, Math.ceil(n / 8 / 5) * 5);
+    for (var i = 0; i <= n; i += step) g.fillText(i + '年', X(i), H - 18);
+    g.fillText('経過年数（現在から）', (padL + W - padR) / 2, H - 4);
+  }
+
+  ids.forEach(function(k){ document.getElementById(k).addEventListener('input', render); });
+  document.getElementById('mode').addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>
