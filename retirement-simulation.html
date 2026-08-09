@@ -56,6 +56,18 @@
   .card .label { font-size:12px; color:var(--muted); margin-bottom:6px; }
   .card .value { font-size:19px; font-weight:500; font-variant-numeric:tabular-nums; }
   .card .csub { font-size:11px; color:var(--faint); margin-top:4px; }
+  .amounts { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;
+             background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:16px; }
+  .amt label { display:block; font-size:13px; color:var(--muted); margin-bottom:5px; }
+  .amt-in { display:flex; align-items:center; gap:6px; }
+  .amt-in input { flex:1; min-width:0; padding:8px 10px; font-size:16px; font-family:inherit; font-variant-numeric:tabular-nums;
+                  text-align:right; border:1px solid var(--input-bd); border-radius:6px; background:var(--input-bg); color:var(--text); }
+  .amt-in span { font-size:13px; color:var(--muted); }
+  .amt-reset { display:flex; justify-content:flex-end; }
+  #reset { padding:8px 14px; font-size:13px; font-family:inherit; color:var(--muted); cursor:pointer;
+           background:transparent; border:1px solid var(--input-bd); border-radius:6px; }
+  #reset:hover { color:var(--text); border-color:var(--muted); }
+  .amt-in input:focus-visible, #reset:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
   .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:0 0 1.5rem; }
   .ctl-label { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:4px; gap:8px; }
   .ctl-label span:last-child { color:var(--text); font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -108,6 +120,20 @@
     <div class="card"><div class="label">iDeCo（拠出＋運用益で複利）</div><div class="value" id="d-idecoval">—</div><div class="csub" id="s-idecoval"></div></div>
     <div class="card"><div class="label">取り崩し開始時の資産額（合計）</div><div class="value" id="d-startval">—</div><div class="csub" id="s-startval"></div></div>
     <div class="card"><div class="label">積立期間中の受取配当（税引後・累計）</div><div class="value" id="d-cumdiv">—</div><div class="csub" id="s-cumdiv"></div></div>
+  </div>
+
+  <div class="amounts">
+    <div class="amt">
+      <label for="v0">証券口座の現在残高</label>
+      <div class="amt-in"><input type="number" id="v0" min="0" max="1000000" step="1" value="1345" inputmode="decimal"><span>万円</span></div>
+    </div>
+    <div class="amt">
+      <label for="ideco0">iDeCoの現在残高</label>
+      <div class="amt-in"><input type="number" id="ideco0" min="0" max="1000000" step="1" value="300" inputmode="decimal"><span>万円</span></div>
+    </div>
+    <div class="amt amt-reset">
+      <button type="button" id="reset">入力をリセット</button>
+    </div>
   </div>
 
   <div class="controls">
@@ -188,8 +214,6 @@
 <script>
 (function(){
 // ==MODEL-START==
-var V0 = 1345.0;                 // 万円 証券口座の現在残高
-var IDECO0 = 300.0;              // 万円 iDeCoの現在残高
 var IDECO_CONTRIB_END_AGE = 65;  // iDeCo拠出は65歳未満まで
 var IDECO_WITHDRAW_AGE = 60;     // iDeCoの受給開始は60歳から
 var MAX_AGE = 120;               // シミュレーション上限年齢
@@ -197,13 +221,13 @@ var MAX_AGE = 120;               // シミュレーション上限年齢
 // 純粋関数。DOMには一切触れない（テストから直接呼べるようにするため）
 function calc(p){
   var R = p.D + p.G;             // トータルリターン
-  var stock = V0;
-  var stockBasis = V0;           // 証券口座の取得原価（売却益課税の計算に使う）
-  var ideco = IDECO0;
+  var stock = p.V0;
+  var stockBasis = p.V0;         // 証券口座の取得原価（売却益課税の計算に使う）
+  var ideco = p.IDECO0;
   var cumDivNet = 0, lastDivNet = 0;
   var idecoContribStopped = false;
 
-  var labels = [0], bal = [V0 + IDECO0], phase = [0], ages = [p.age0];
+  var labels = [0], bal = [p.V0 + p.IDECO0], phase = [0], ages = [p.age0];
 
   // ---- 積立期 ----
   for (var i = 1; i <= p.N; i++){
@@ -305,8 +329,16 @@ function calc(p){
 
   function num(id){ return +document.getElementById(id).value; }
 
+  // 数値入力は空欄・マイナス・文字列を弾いて0以上に丸める
+  function amount(id){
+    var v = parseFloat(document.getElementById(id).value);
+    if (!isFinite(v) || v < 0) return 0;
+    return Math.min(v, 1000000);
+  }
+
   function readParams(){
     return {
+      V0: amount('v0'), IDECO0: amount('ideco0'),
       age0: num('age'), N: num('n'),
       D: num('d')/100, G: num('g')/100, WR: num('wr')/100, T: num('t')/100,
       AS: num('as'), IC: num('ic'), P: num('p'), PA: num('pa'), L: num('l'),
@@ -341,9 +373,9 @@ function calc(p){
     document.getElementById('h-title').textContent =
       '積立' + p.N + '年（' + r.startAge + '歳）→ 取り崩しシミュレーション';
     document.getElementById('h-sub').textContent =
-      '証券口座1,345万円は配当再投資なし' +
+      '証券口座' + yen(p.V0) + 'は配当再投資なし' +
       (p.AS > 0 ? '・年' + p.AS + '万円を追加投資' : '') +
-      '／iDeCo300万円は年' + p.IC.toFixed(1) + '万円を拠出継続';
+      '／iDeCo' + yen(p.IDECO0) + 'は年' + p.IC.toFixed(1) + '万円を拠出継続';
 
     document.getElementById('d-stockval').textContent = yen(r.stockStartVal);
     document.getElementById('s-stockval').textContent = '成長率' + num('g') + '%で複利' + (p.AS > 0 ? '＋追加投資' : '');
@@ -578,8 +610,27 @@ function calc(p){
   new MutationObserver(function(){ if (last) drawChart(last); })
     .observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
 
+  var amountIds = ['v0','ideco0'];
+  var allIds = amountIds.concat(ids, ['mode']);
+
+  // リセット用に、ページ読み込み時の値を控えておく
+  var defaults = {};
+  allIds.forEach(function(k){ defaults[k] = document.getElementById(k).value; });
+
   ids.forEach(function(k){ document.getElementById(k).addEventListener('input', render); });
+  amountIds.forEach(function(k){
+    var el = document.getElementById(k);
+    el.addEventListener('input', render);
+    el.addEventListener('blur', function(){          // 空欄のまま離れたら0を補う
+      if (el.value.trim() === '' || !isFinite(parseFloat(el.value))) el.value = '0';
+      render();
+    });
+  });
   document.getElementById('mode').addEventListener('change', render);
+  document.getElementById('reset').addEventListener('click', function(){
+    allIds.forEach(function(k){ document.getElementById(k).value = defaults[k]; });
+    render();
+  });
   render();
 })();
 </script>
