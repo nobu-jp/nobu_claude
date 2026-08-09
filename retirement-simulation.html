@@ -56,19 +56,25 @@
   .card .label { font-size:12px; color:var(--muted); margin-bottom:6px; }
   .card .value { font-size:19px; font-weight:500; font-variant-numeric:tabular-nums; }
   .card .csub { font-size:11px; color:var(--faint); margin-top:4px; }
-  .amounts { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;
-             background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:16px; }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:1.5rem; }
   .amt label { display:block; font-size:13px; color:var(--muted); margin-bottom:5px; }
   .amt-in { display:flex; align-items:center; gap:6px; }
   .amt-in input { flex:1; min-width:0; padding:8px 10px; font-size:16px; font-family:inherit; font-variant-numeric:tabular-nums;
                   text-align:right; border:1px solid var(--input-bd); border-radius:6px; background:var(--input-bg); color:var(--text); }
   .amt-in span { font-size:13px; color:var(--muted); }
-  .amt-reset { display:flex; justify-content:flex-end; }
+  .panel-foot { display:flex; justify-content:flex-end; margin-top:14px; }
   #reset { padding:8px 14px; font-size:13px; font-family:inherit; color:var(--muted); cursor:pointer;
            background:transparent; border:1px solid var(--input-bd); border-radius:6px; }
   #reset:hover { color:var(--text); border-color:var(--muted); }
-  .amt-in input:focus-visible, #reset:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
-  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:0 0 1.5rem; }
+  .amt-in input:focus-visible, #reset:focus-visible, .adv summary:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  .adv { margin-top:16px; border-top:1px solid var(--border); padding-top:12px; }
+  .adv summary { display:flex; align-items:center; gap:7px; cursor:pointer; list-style:none;
+                 font-size:13px; color:var(--acc); padding:4px 0; border-radius:4px; }
+  .adv summary::-webkit-details-marker { display:none; }
+  .adv summary::before { content:'▸'; display:inline-block; font-size:11px; transition:transform .15s; }
+  .adv[open] summary::before { transform:rotate(90deg); }
+  .adv .controls { margin-top:16px; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:0; }
   .ctl-label { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:4px; gap:8px; }
   .ctl-label span:last-child { color:var(--text); font-weight:500; white-space:nowrap; font-variant-numeric:tabular-nums; }
   input[type=range] { width:100%; accent-color:var(--acc); }
@@ -103,7 +109,10 @@
     .card, .result-card { padding:.8rem; }
     .card .value { font-size:17px; }
     .result-card .rvalue { font-size:20px; }
-    .controls { gap:14px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+    .controls { gap:14px; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
+    .panel { padding:12px; }
+    .adv summary { padding:8px 0; }
+    @media (prefers-reduced-motion: reduce) { .adv summary::before { transition:none; } }
     .chart-wrap { height:230px; }
     input[type=range] { height:28px; }
   }
@@ -122,72 +131,78 @@
     <div class="card"><div class="label">積立期間中の受取配当（税引後・累計）</div><div class="value" id="d-cumdiv">—</div><div class="csub" id="s-cumdiv"></div></div>
   </div>
 
-  <div class="amounts">
-    <div class="amt">
-      <label for="v0">証券口座の現在残高</label>
-      <div class="amt-in"><input type="number" id="v0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
+  <div class="panel">
+    <div class="controls">
+      <div>
+        <div class="ctl-label"><span>現在の年齢</span><span id="o-age">45歳</span></div>
+        <input type="range" id="age" min="25" max="70" step="1" value="45">
+      </div>
+      <div>
+        <div class="ctl-label"><span>積立期間（取り崩し開始まで）</span><span id="o-n">20年</span></div>
+        <input type="range" id="n" min="0" max="35" step="1" value="20">
+      </div>
+      <div class="amt">
+        <label for="v0">証券口座の現在残高</label>
+        <div class="amt-in"><input type="number" id="v0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
+      </div>
+      <div class="amt">
+        <label for="ideco0">iDeCoの現在残高</label>
+        <div class="amt-in"><input type="number" id="ideco0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
+      </div>
+      <div>
+        <div class="ctl-label"><span>生活費目標（年間・税引後）</span><span id="o-l">300万円</span></div>
+        <input type="range" id="l" min="100" max="600" step="10" value="300">
+      </div>
+      <div>
+        <div class="ctl-label"><span>年金受給額（年間・税引後）</span><span id="o-p">80万円</span></div>
+        <input type="range" id="p" min="0" max="280" step="10" value="80">
+      </div>
     </div>
-    <div class="amt">
-      <label for="ideco0">iDeCoの現在残高</label>
-      <div class="amt-in"><input type="number" id="ideco0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
-    </div>
-    <div class="amt amt-reset">
-      <button type="button" id="reset">入力をリセット</button>
-    </div>
-  </div>
 
-  <div class="controls">
-    <div>
-      <div class="ctl-label"><span>現在の年齢</span><span id="o-age">45歳</span></div>
-      <input type="range" id="age" min="25" max="70" step="1" value="45">
-    </div>
-    <div>
-      <div class="ctl-label"><span>積立期間（取り崩し開始まで）</span><span id="o-n">20年</span></div>
-      <input type="range" id="n" min="0" max="35" step="1" value="20">
-    </div>
-    <div>
-      <div class="ctl-label"><span>配当利回り</span><span id="o-d">3.2%</span></div>
-      <input type="range" id="d" min="0" max="7" step="0.1" value="3.2">
-    </div>
-    <div>
-      <div class="ctl-label"><span>株価の成長率</span><span id="o-g">2%</span></div>
-      <input type="range" id="g" min="-2" max="8" step="0.1" value="2">
-    </div>
-    <div>
-      <div class="ctl-label"><span>取り崩し方針</span><span></span></div>
-      <select id="mode">
-        <option value="max" selected>生活費が足りなければ多く取り崩す</option>
-        <option value="fixed">定額（開始時資産×取り崩し率）</option>
-        <option value="need">生活費の不足分だけ取り崩す</option>
-      </select>
-    </div>
-    <div>
-      <div class="ctl-label"><span>取り崩し率（定額分）</span><span id="o-wr">4.0%</span></div>
-      <input type="range" id="wr" min="2" max="7" step="0.1" value="4.0">
-    </div>
-    <div>
-      <div class="ctl-label"><span>証券口座 年間追加投資</span><span id="o-as">0万円</span></div>
-      <input type="range" id="as" min="0" max="360" step="10" value="0">
-    </div>
-    <div>
-      <div class="ctl-label"><span>iDeCo 年間積立額</span><span id="o-ic">14.4万円</span></div>
-      <input type="range" id="ic" min="0" max="81.6" step="1.2" value="14.4">
-    </div>
-    <div>
-      <div class="ctl-label"><span>年金受給額（年間・税引後）</span><span id="o-p">80万円</span></div>
-      <input type="range" id="p" min="0" max="280" step="10" value="80">
-    </div>
-    <div>
-      <div class="ctl-label"><span>年金受給開始年齢</span><span id="o-pa">65歳</span></div>
-      <input type="range" id="pa" min="60" max="75" step="1" value="65">
-    </div>
-    <div>
-      <div class="ctl-label"><span>生活費目標（年間・税引後）</span><span id="o-l">300万円</span></div>
-      <input type="range" id="l" min="100" max="600" step="10" value="300">
-    </div>
-    <div>
-      <div class="ctl-label"><span>配当・売却益への税率</span><span id="o-t">20.315%</span></div>
-      <input type="range" id="t" min="0" max="25" step="0.005" value="20.315">
+    <details class="adv">
+      <summary>詳細設定（利回り・税率・年金開始年齢など）</summary>
+      <div class="controls">
+        <div>
+          <div class="ctl-label"><span>配当利回り</span><span id="o-d">3.2%</span></div>
+          <input type="range" id="d" min="0" max="7" step="0.1" value="3.2">
+        </div>
+        <div>
+          <div class="ctl-label"><span>株価の成長率</span><span id="o-g">2%</span></div>
+          <input type="range" id="g" min="-2" max="8" step="0.1" value="2">
+        </div>
+        <div>
+          <div class="ctl-label"><span>取り崩し方針</span><span></span></div>
+          <select id="mode">
+            <option value="max" selected>生活費が足りなければ多く取り崩す</option>
+            <option value="fixed">定額（開始時資産×取り崩し率）</option>
+            <option value="need">生活費の不足分だけ取り崩す</option>
+          </select>
+        </div>
+        <div>
+          <div class="ctl-label"><span>取り崩し率（定額分）</span><span id="o-wr">4.0%</span></div>
+          <input type="range" id="wr" min="2" max="7" step="0.1" value="4.0">
+        </div>
+        <div>
+          <div class="ctl-label"><span>年金受給開始年齢</span><span id="o-pa">65歳</span></div>
+          <input type="range" id="pa" min="60" max="75" step="1" value="65">
+        </div>
+        <div>
+          <div class="ctl-label"><span>証券口座 年間追加投資</span><span id="o-as">0万円</span></div>
+          <input type="range" id="as" min="0" max="360" step="10" value="0">
+        </div>
+        <div>
+          <div class="ctl-label"><span>iDeCo 年間積立額</span><span id="o-ic">14.4万円</span></div>
+          <input type="range" id="ic" min="0" max="81.6" step="1.2" value="14.4">
+        </div>
+        <div>
+          <div class="ctl-label"><span>配当・売却益への税率</span><span id="o-t">20.315%</span></div>
+          <input type="range" id="t" min="0" max="25" step="0.005" value="20.315">
+        </div>
+      </div>
+    </details>
+
+    <div class="panel-foot">
+      <button type="button" id="reset">入力をリセット</button>
     </div>
   </div>
 
@@ -353,6 +368,32 @@ function calc(p){
     return Math.round(v).toLocaleString() + '万円';
   }
 
+  // 何も触っていない初期状態で結果を出すと誤解を招くため、入力を待つ
+  var touched = false;
+
+  function showEmptyState(){
+    ['r-years','r-income','r-gap'].forEach(function(id){
+      document.getElementById(id).textContent = '—';
+      document.getElementById(id).className = 'rvalue';
+    });
+    document.getElementById('s-years').textContent = '残高を入力すると試算します';
+    document.getElementById('s-income').textContent = '';
+    document.getElementById('s-gap').textContent = '';
+    document.getElementById('warn').innerHTML = '';
+    ['d-stockval','d-idecoval','d-startval','d-cumdiv'].forEach(function(id){
+      document.getElementById(id).textContent = '—';
+    });
+    ['s-stockval','s-idecoval','s-startval','s-cumdiv'].forEach(function(id){
+      document.getElementById(id).textContent = '';
+    });
+    var cv = document.getElementById('ch');
+    var g = cv.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, cv.width, cv.height);
+    last = null;
+    document.getElementById('tip').classList.remove('on');
+  }
+
   function render(){
     var p = readParams();
 
@@ -367,6 +408,14 @@ function calc(p){
     document.getElementById('o-pa').textContent = p.PA + '歳';
     document.getElementById('o-l').textContent = p.L + '万円';
     document.getElementById('o-t').textContent = pct(num('t')) + '%';
+
+    if (!touched && p.V0 + p.IDECO0 === 0){
+      document.getElementById('h-title').textContent = '積立 → 取り崩しシミュレーション';
+      document.getElementById('h-sub').textContent = '下の欄に証券口座とiDeCoの現在残高を入力してください';
+      document.getElementById('notes').innerHTML = '';
+      showEmptyState();
+      return;
+    }
 
     var r = calc(p);
 
@@ -619,18 +668,22 @@ function calc(p){
   var defaults = {};
   allIds.forEach(function(k){ defaults[k] = document.getElementById(k).value; });
 
-  ids.forEach(function(k){ document.getElementById(k).addEventListener('input', render); });
+  function onTouch(){ touched = true; render(); }
+
+  ids.forEach(function(k){ document.getElementById(k).addEventListener('input', onTouch); });
   amountIds.forEach(function(k){
     var el = document.getElementById(k);
-    el.addEventListener('input', render);
+    el.addEventListener('input', onTouch);
     el.addEventListener('blur', function(){          // 空欄のまま離れたら0を補う
       if (el.value.trim() === '' || !isFinite(parseFloat(el.value))) el.value = '0';
       render();
     });
   });
-  document.getElementById('mode').addEventListener('change', render);
+  document.getElementById('mode').addEventListener('change', onTouch);
   document.getElementById('reset').addEventListener('click', function(){
     allIds.forEach(function(k){ document.getElementById(k).value = defaults[k]; });
+    touched = false;                                  // 未入力の状態まで戻す
+    document.querySelector('.adv').open = false;
     render();
   });
   render();
