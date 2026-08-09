@@ -113,7 +113,7 @@
 <body>
 <div class="wrap">
   <h1 id="h-title">積立 → 取り崩しシミュレーション</h1>
-  <div class="sub" id="h-sub">証券口座1,345万円は配当再投資なし・iDeCo300万円</div>
+  <div class="sub" id="h-sub">証券口座とiDeCoの残高を入力してください</div>
 
   <div class="grid4">
     <div class="card"><div class="label">証券口座（値上がり＋追加投資）</div><div class="value" id="d-stockval">—</div><div class="csub" id="s-stockval"></div></div>
@@ -125,11 +125,11 @@
   <div class="amounts">
     <div class="amt">
       <label for="v0">証券口座の現在残高</label>
-      <div class="amt-in"><input type="number" id="v0" min="0" max="1000000" step="1" value="1345" inputmode="decimal"><span>万円</span></div>
+      <div class="amt-in"><input type="number" id="v0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
     </div>
     <div class="amt">
       <label for="ideco0">iDeCoの現在残高</label>
-      <div class="amt-in"><input type="number" id="ideco0" min="0" max="1000000" step="1" value="300" inputmode="decimal"><span>万円</span></div>
+      <div class="amt-in"><input type="number" id="ideco0" min="0" max="1000000" step="1" value="0" placeholder="0" inputmode="decimal"><span>万円</span></div>
     </div>
     <div class="amt amt-reset">
       <button type="button" id="reset">入力をリセット</button>
@@ -372,10 +372,11 @@ function calc(p){
 
     document.getElementById('h-title').textContent =
       '積立' + p.N + '年（' + r.startAge + '歳）→ 取り崩しシミュレーション';
-    document.getElementById('h-sub').textContent =
-      '証券口座' + yen(p.V0) + 'は配当再投資なし' +
-      (p.AS > 0 ? '・年' + p.AS + '万円を追加投資' : '') +
-      '／iDeCo' + yen(p.IDECO0) + 'は年' + p.IC.toFixed(1) + '万円を拠出継続';
+    document.getElementById('h-sub').textContent = (p.V0 + p.IDECO0 === 0)
+      ? '下の欄に証券口座とiDeCoの現在残高を入力してください'
+      : '証券口座' + yen(p.V0) + 'は配当再投資なし' +
+        (p.AS > 0 ? '・年' + p.AS + '万円を追加投資' : '') +
+        '／iDeCo' + yen(p.IDECO0) + 'は年' + p.IC.toFixed(1) + '万円を拠出継続';
 
     document.getElementById('d-stockval').textContent = yen(r.stockStartVal);
     document.getElementById('s-stockval').textContent = '成長率' + num('g') + '%で複利' + (p.AS > 0 ? '＋追加投資' : '');
@@ -459,7 +460,8 @@ function calc(p){
       '・証券口座の取り崩しは<b>含み益の割合にのみ' + num('t').toFixed(3) + '%課税</b>し、税引後の手取りを収入としています。iDeCoの受取は退職所得控除・公的年金等控除が使えるため、ここでは非課税として扱っています（実際の税額は受取方法で変わります）',
       '・年金額・生活費目標は税引後（手取り）の金額として扱っています。年金は公的年金等控除により低額であれば概ね非課税です',
       '・インフレ調整はしていません。すべて現在の物価水準での金額です（本来の「4%ルール」は毎年インフレ率だけ取り崩し額を増やす手法で、本ツールの定額取り崩しとは異なります）',
-      '・年金額・生活費はあくまで仮の数字です。ねんきん定期便の見込み額や実際の生活費に置き換えて調整してください'
+      '・年金額・生活費はあくまで仮の数字です。ねんきん定期便の見込み額や実際の生活費に置き換えて調整してください',
+      '<br>本ツールは上記の前提を置いた概算であり、投資助言・税務助言ではありません。運用利回りは毎年一定と仮定しているため、実際の値動きによる差は反映されません。将来の運用成績・税額・年金額を保証するものではないため、重要な判断の際は専門家にご相談ください。入力した数値はブラウザの外へ送信されません'
     ].join('<br>');
 
     // グラフ（外部ライブラリなしで描画）
