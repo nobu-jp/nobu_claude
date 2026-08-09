@@ -88,6 +88,16 @@
   .warn { background:var(--warn-bg); border:1px solid var(--warn-bd); border-radius:12px; padding:12px 14px; margin-bottom:1.5rem; font-size:12px; line-height:1.7; color:var(--warn-tx); }
   .warn:empty { display:none; }
   .warn b { font-weight:600; }
+  .info { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:1rem;
+          font-size:12px; line-height:1.8; color:var(--text); }
+  .info:empty { display:none; }
+  .info h4 { margin:0 0 6px; font-size:12px; font-weight:600; color:var(--muted); }
+  .info table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  .info td { padding:2px 0; }
+  .info td:last-child { text-align:right; font-weight:500; }
+  .info .row-tax td:last-child { color:var(--bad); }
+  .info .row-free td:last-child { color:var(--ok); }
+  .info .adj { margin-top:6px; color:var(--warn-tx); }
   .legend { display:flex; gap:16px; font-size:12px; color:var(--legend); margin-bottom:8px; flex-wrap:wrap; }
   .legend span { display:flex; align-items:center; gap:5px; }
   .sw { width:10px; height:10px; border-radius:2px; display:inline-block; }
@@ -125,8 +135,8 @@
   <div class="sub" id="h-sub">証券口座とiDeCoの残高を入力してください</div>
 
   <div class="grid4">
-    <div class="card"><div class="label">証券口座（値上がり＋追加投資）</div><div class="value" id="d-stockval">—</div><div class="csub" id="s-stockval"></div></div>
-    <div class="card"><div class="label">iDeCo（拠出＋運用益で複利）</div><div class="value" id="d-idecoval">—</div><div class="csub" id="s-idecoval"></div></div>
+    <div class="card"><div class="label">証券口座（一時金の受取後）</div><div class="value" id="d-stockval">—</div><div class="csub" id="s-stockval"></div></div>
+    <div class="card"><div class="label">iDeCo（受取額）</div><div class="value" id="d-idecoval">—</div><div class="csub" id="s-idecoval"></div></div>
     <div class="card"><div class="label">取り崩し開始時の資産額（合計）</div><div class="value" id="d-startval">—</div><div class="csub" id="s-startval"></div></div>
     <div class="card"><div class="label">積立期間中の受取配当（税引後・累計）</div><div class="value" id="d-cumdiv">—</div><div class="csub" id="s-cumdiv"></div></div>
   </div>
@@ -201,6 +211,32 @@
       </div>
     </details>
 
+    <details class="adv">
+      <summary>iDeCoの受け取りと退職金（退職所得控除の計算）</summary>
+      <div class="controls">
+        <div>
+          <div class="ctl-label"><span>iDeCo 拠出開始年齢</span><span id="o-icstart">40歳</span></div>
+          <input type="range" id="icstart" min="20" max="64" step="1" value="40">
+        </div>
+        <div>
+          <div class="ctl-label"><span>iDeCo 一時金の受取年齢</span><span id="o-icrecv">65歳</span></div>
+          <input type="range" id="icrecv" min="60" max="75" step="1" value="65">
+        </div>
+        <div>
+          <div class="ctl-label"><span>会社の退職金</span><span id="o-sev">0万円</span></div>
+          <input type="range" id="sev" min="0" max="4000" step="50" value="0">
+        </div>
+        <div>
+          <div class="ctl-label"><span>勤続開始年齢</span><span id="o-sevstart">22歳</span></div>
+          <input type="range" id="sevstart" min="15" max="64" step="1" value="22">
+        </div>
+        <div>
+          <div class="ctl-label"><span>退職金の受取年齢</span><span id="o-sevrecv">60歳</span></div>
+          <input type="range" id="sevrecv" min="45" max="75" step="1" value="60">
+        </div>
+      </div>
+    </details>
+
     <div class="panel-foot">
       <button type="button" id="reset">入力をリセット</button>
     </div>
@@ -212,6 +248,7 @@
     <div class="result-card"><div class="rlabel">生活費目標との差（初年度）</div><div class="rvalue" id="r-gap">—</div><div class="rsub" id="s-gap"></div></div>
   </div>
 
+  <div class="info" id="lump"></div>
   <div class="warn" id="warn"></div>
 
   <div class="legend">
@@ -230,8 +267,36 @@
 (function(){
 // ==MODEL-START==
 var IDECO_CONTRIB_END_AGE = 65;  // iDeCo拠出は65歳未満まで
-var IDECO_WITHDRAW_AGE = 60;     // iDeCoの受給開始は60歳から
 var MAX_AGE = 120;               // シミュレーション上限年齢
+
+// 退職所得控除額（万円）。勤続年数は1年未満切り上げ、2年以下は80万円が下限
+function retirementDeduction(years){
+  if (years <= 0) return 0;
+  return years <= 20 ? Math.max(40 * years, 80) : 800 + 70 * (years - 20);
+}
+
+// 所得税（分離課税・復興特別所得税2.1%込み、万円）
+function incomeTaxOn(taxable){
+  var t;
+  if      (taxable <=  195) t = taxable * 0.05;
+  else if (taxable <=  330) t = taxable * 0.10 -   9.75;
+  else if (taxable <=  695) t = taxable * 0.20 -  42.75;
+  else if (taxable <=  900) t = taxable * 0.23 -  63.6;
+  else if (taxable <= 1800) t = taxable * 0.33 - 153.6;
+  else if (taxable <= 4000) t = taxable * 0.40 - 279.6;
+  else                      t = taxable * 0.45 - 479.6;
+  return Math.max(0, t) * 1.021;
+}
+
+// 一時金にかかる税。overlapYearsは併給調整で差し引く重複期間
+function lumpSumTax(income, years, overlapYears){
+  var ded = retirementDeduction(years) - retirementDeduction(overlapYears || 0);
+  if (ded < 0) ded = 0;
+  var over = Math.max(0, income - ded);
+  // 勤続5年以下の短期退職手当等は300万円超の部分に1/2を適用しない
+  var taxable = (years <= 5 && over > 300) ? 150 + (over - 300) : over * 0.5;
+  return { ded: ded, taxable: taxable, tax: incomeTaxOn(taxable) + taxable * 0.10 };
+}
 
 // 純粋関数。DOMには一切触れない（テストから直接呼べるようにするため）
 function calc(p){
@@ -242,11 +307,64 @@ function calc(p){
   var cumDivNet = 0, lastDivNet = 0;
   var idecoContribStopped = false;
 
+  var startAge = p.age0 + p.N;
+
+  // ---- 退職所得控除の前提を先に固める ----
+  var icRecvAge = Math.max(p.icRecvAge, p.age0);          // 過去指定なら現時点で受け取る
+  var icEndAge  = Math.min(IDECO_CONTRIB_END_AGE, icRecvAge, startAge);
+  var icYears   = Math.max(0, icEndAge - p.icStartAge);   // 掛金を拠出した年数
+
+  var hasSev      = p.sevAmount > 0 && p.sevRecvAge >= p.age0;
+  var sevPastDone = p.sevAmount > 0 && p.sevRecvAge < p.age0;   // すでに受取済み
+  var sevYears    = hasSev ? Math.max(0, p.sevRecvAge - p.sevStartAge) : 0;
+
+  // 拠出期間と勤続期間の重複年数
+  var overlap = 0;
+  if (hasSev){
+    overlap = Math.max(0, Math.min(icEndAge, p.sevRecvAge) - Math.max(p.icStartAge, p.sevStartAge));
+  }
+  var gap = hasSev ? icRecvAge - p.sevRecvAge : null;
+  var sameYear    = hasSev && gap === 0;
+  var adjustIdeco = hasSev && gap > 0 && gap <= 14;   // 退職金が先（15年ルール）
+  var adjustSev   = hasSev && gap < 0 && -gap <=  9;  // iDeCoが先（10年ルール・令和8年〜）
+
+  var idecoLump = null, sevLump = null;
+  var idecoReceived = false, sevReceived = !hasSev;
+
+  // その年に受け取る一時金を処理し、税引後を証券口座へ移す
+  function processLumps(age){
+    if (sameYear && !idecoReceived && age === icRecvAge){
+      var inc = ideco + p.sevAmount;
+      var r = lumpSumTax(inc, icYears + sevYears - overlap, 0);
+      var net = inc - r.tax;
+      stock += net; stockBasis += net;
+      idecoLump = {age:age, amount:ideco, sev:p.sevAmount, ded:r.ded, taxable:r.taxable, tax:r.tax, combined:true};
+      ideco = 0; idecoReceived = true; sevReceived = true;
+      return;
+    }
+    if (!sevReceived && age === p.sevRecvAge){
+      var r2 = lumpSumTax(p.sevAmount, sevYears, adjustSev ? overlap : 0);
+      var net2 = p.sevAmount - r2.tax;
+      stock += net2; stockBasis += net2;
+      sevLump = {age:age, amount:p.sevAmount, ded:r2.ded, taxable:r2.taxable, tax:r2.tax, adjusted:adjustSev};
+      sevReceived = true;
+    }
+    if (!idecoReceived && age === icRecvAge){
+      var r3 = lumpSumTax(ideco, icYears, adjustIdeco ? overlap : 0);
+      var net3 = ideco - r3.tax;
+      stock += net3; stockBasis += net3;
+      idecoLump = {age:age, amount:ideco, ded:r3.ded, taxable:r3.taxable, tax:r3.tax, adjusted:adjustIdeco};
+      ideco = 0; idecoReceived = true;
+    }
+  }
+
   var labels = [0], bal = [p.V0 + p.IDECO0], phase = [0], ages = [p.age0];
 
   // ---- 積立期 ----
   for (var i = 1; i <= p.N; i++){
     var ageAtStart = p.age0 + i - 1;
+    processLumps(ageAtStart);
+
     var divNet = stock * p.D * (1 - p.T);   // 配当は再投資せず、税引後を受け取る
     cumDivNet += divNet;
     lastDivNet = divNet;
@@ -254,14 +372,17 @@ function calc(p){
     stock = stock * (1 + p.G) + p.AS;       // 値上がり分＋追加投資のみで増える
     stockBasis += p.AS;
 
-    var ic = (ageAtStart < IDECO_CONTRIB_END_AGE) ? p.IC : 0;
-    if (ic === 0 && p.IC > 0) idecoContribStopped = true;
+    var ic = (ageAtStart < IDECO_CONTRIB_END_AGE && !idecoReceived) ? p.IC : 0;
+    if (ic === 0 && p.IC > 0 && !idecoReceived) idecoContribStopped = true;
     ideco = ideco * (1 + R) + ic;           // iDeCoは非課税で複利継続
 
     labels.push(i); bal.push(stock + ideco); phase.push(0); ages.push(p.age0 + i);
   }
 
-  var startAge = p.age0 + p.N;
+  // 取り崩し開始年に受け取る一時金は、資産額を確定する前に処理する
+  // （定額取り崩しの基準額を税引後の実際の資産に合わせるため）
+  processLumps(startAge);
+
   var startVal = stock + ideco;
   var stockStartVal = stock, idecoStartVal = ideco;
   var Wfixed = startVal * p.WR;             // 定額取り崩し額（税引前）
@@ -275,20 +396,18 @@ function calc(p){
 
   for (var k = 1; k <= maxYears; k++){
     var age = startAge + k - 1;
+    processLumps(age);
 
     stock = stock * (1 + R);                // 取り崩し期は配当も再投資して運用継続
     ideco = ideco * (1 + R);
 
-    var idecoAvail = age >= IDECO_WITHDRAW_AGE;
-    var pot = stock + (idecoAvail ? ideco : 0);
-    if (!idecoAvail && ideco > 0) lockedYears++;
+    if (ideco > 0) lockedYears++;           // 一時金の受取前は取り崩せない
 
     var pension = (age >= p.PA) ? p.P : 0;
 
     // 取り崩し1万円あたりの税負担（証券口座の含み益部分にのみ課税）
     var gainRatio = stock > 0 ? Math.max(0, (stock - stockBasis) / stock) : 0;
-    var stockShare = pot > 0 ? stock / pot : 0;
-    var effTax = stockShare * gainRatio * p.T;
+    var effTax = gainRatio * p.T;
 
     var need = Math.max(0, p.L - pension);
     var Wneed = effTax < 0.99 ? need / (1 - effTax) : need;
@@ -297,23 +416,19 @@ function calc(p){
     if (p.mode === 'fixed')      W = Wfixed;
     else if (p.mode === 'need')  W = Wneed;
     else                         W = Math.max(Wfixed, Wneed);
-    if (W > pot) W = pot;
+    if (W > stock) W = stock;
     if (W < 0) W = 0;
 
-    var fromStock = W * stockShare;
-    var fromIdeco = W - fromStock;
-    var tax = fromStock * gainRatio * p.T;
+    var tax = W * gainRatio * p.T;
     var net = pension + W - tax;
 
-    if (stock > 0) stockBasis *= (1 - fromStock / stock);
-    stock -= fromStock;
-    ideco -= fromIdeco;
+    if (stock > 0) stockBasis *= (1 - W / stock);
+    stock -= W;
     if (stock < 0) stock = 0;
-    if (ideco < 0) ideco = 0;
 
     if (net < p.L - 0.5) shortfallYears++;
 
-    var row = {age:age, pension:pension, gross:W, tax:tax, net:net, idecoAvail:idecoAvail};
+    var row = {age:age, pension:pension, gross:W, tax:tax, net:net, idecoLocked:ideco > 0};
     if (k === 1) first = row;
     if (firstWithPension === null && pension > 0) firstWithPension = row;
 
@@ -335,12 +450,15 @@ function calc(p){
     cumDivNet:cumDivNet, lastDivNet:lastDivNet, idecoContribStopped:idecoContribStopped,
     Wfixed:Wfixed, first:first, firstWithPension:firstWithPension,
     depletedYear:depletedYear, depletedAge:depletedAge, everDeclined:everDeclined,
-    shortfallYears:shortfallYears, lockedYears:lockedYears, finalBal:finalBal
+    shortfallYears:shortfallYears, lockedYears:lockedYears, finalBal:finalBal,
+    icRecvAge:icRecvAge, icYears:icYears, sevYears:sevYears, overlap:overlap,
+    idecoLump:idecoLump, sevLump:sevLump, sevPastDone:sevPastDone,
+    adjustIdeco:adjustIdeco, adjustSev:adjustSev, sameYear:sameYear
   };
 }
 // ==MODEL-END==
 
-  var ids = ['age','n','d','g','wr','as','ic','p','pa','l','t'];
+  var ids = ['age','n','d','g','wr','as','ic','p','pa','l','t','icstart','icrecv','sev','sevstart','sevrecv'];
 
   function num(id){ return +document.getElementById(id).value; }
 
@@ -357,6 +475,8 @@ function calc(p){
       age0: num('age'), N: num('n'),
       D: num('d')/100, G: num('g')/100, WR: num('wr')/100, T: num('t')/100,
       AS: num('as'), IC: num('ic'), P: num('p'), PA: num('pa'), L: num('l'),
+      icStartAge: num('icstart'), icRecvAge: num('icrecv'),
+      sevAmount: num('sev'), sevStartAge: num('sevstart'), sevRecvAge: num('sevrecv'),
       mode: document.getElementById('mode').value
     };
   }
@@ -380,6 +500,7 @@ function calc(p){
     document.getElementById('s-income').textContent = '';
     document.getElementById('s-gap').textContent = '';
     document.getElementById('warn').innerHTML = '';
+    document.getElementById('lump').innerHTML = '';
     ['d-stockval','d-idecoval','d-startval','d-cumdiv'].forEach(function(id){
       document.getElementById(id).textContent = '—';
     });
@@ -408,6 +529,11 @@ function calc(p){
     document.getElementById('o-pa').textContent = p.PA + '歳';
     document.getElementById('o-l').textContent = p.L + '万円';
     document.getElementById('o-t').textContent = pct(num('t')) + '%';
+    document.getElementById('o-icstart').textContent = p.icStartAge + '歳';
+    document.getElementById('o-icrecv').textContent = p.icRecvAge + '歳';
+    document.getElementById('o-sev').textContent = p.sevAmount + '万円';
+    document.getElementById('o-sevstart').textContent = p.sevStartAge + '歳';
+    document.getElementById('o-sevrecv').textContent = p.sevRecvAge + '歳';
 
     if (!touched && p.V0 + p.IDECO0 === 0){
       document.getElementById('h-title').textContent = '積立 → 取り崩しシミュレーション';
@@ -428,9 +554,16 @@ function calc(p){
         '／iDeCo' + yen(p.IDECO0) + 'は年' + p.IC.toFixed(1) + '万円を拠出継続';
 
     document.getElementById('d-stockval').textContent = yen(r.stockStartVal);
-    document.getElementById('s-stockval').textContent = '成長率' + num('g') + '%で複利' + (p.AS > 0 ? '＋追加投資' : '');
-    document.getElementById('d-idecoval').textContent = yen(r.idecoStartVal);
-    document.getElementById('s-idecoval').textContent = 'トータルリターン' + (r.R*100).toFixed(1) + '%で複利';
+    document.getElementById('s-stockval').textContent = r.idecoLump
+      ? '成長率' + num('g') + '%で複利。iDeCo等の一時金を含む'
+      : '成長率' + num('g') + '%で複利' + (p.AS > 0 ? '＋追加投資' : '');
+    if (r.idecoLump){
+      document.getElementById('d-idecoval').textContent = yen(r.idecoLump.amount);
+      document.getElementById('s-idecoval').textContent = r.idecoLump.age + '歳で一時金として受取';
+    } else {
+      document.getElementById('d-idecoval').textContent = yen(r.idecoStartVal);
+      document.getElementById('s-idecoval').textContent = 'トータルリターン' + (r.R*100).toFixed(1) + '%で複利';
+    }
     document.getElementById('d-startval').textContent = yen(r.startVal);
     document.getElementById('s-startval').textContent = r.startAge + '歳時点の合計';
     document.getElementById('d-cumdiv').textContent = yen(r.cumDivNet);
@@ -480,11 +613,45 @@ function calc(p){
       document.getElementById('s-gap').textContent = '';
     }
 
+    // 一時金の退職所得課税
+    var lumpRows = [];
+    function lumpBlock(title, l, years, adjusted, extra){
+      var free = l.tax < 0.5;
+      return '<h4>' + title + '</h4><table>'
+        + '<tr><td>受取額' + (extra || '') + '</td><td>' + yen(l.amount + (l.sev || 0)) + '</td></tr>'
+        + '<tr><td>退職所得控除（拠出・勤続' + years + '年）</td><td>' + yen(l.ded) + '</td></tr>'
+        + '<tr><td>課税対象（超過分の1/2）</td><td>' + yen(l.taxable) + '</td></tr>'
+        + '<tr class="' + (free ? 'row-free' : 'row-tax') + '"><td>所得税・住民税</td><td>'
+        + (free ? '非課税' : yen(l.tax)) + '</td></tr></table>'
+        + (adjusted ? '<div class="adj">※ もう一方の一時金と受取年が近いため、重複する'
+                      + r.overlap + '年分の控除が差し引かれています</div>' : '');
+    }
+    if (r.idecoLump && r.idecoLump.combined){
+      lumpRows.push(lumpBlock('iDeCo一時金＋退職金（同じ年に受取・合算）', r.idecoLump,
+        r.icYears + r.sevYears - r.overlap, false,
+        '（iDeCo ' + yen(r.idecoLump.amount) + ' ＋ 退職金 ' + yen(r.idecoLump.sev) + '）'));
+    } else {
+      if (r.sevLump) lumpRows.push(lumpBlock('会社の退職金（' + r.sevLump.age + '歳で受取）', r.sevLump, r.sevYears, r.sevLump.adjusted));
+      if (r.idecoLump) lumpRows.push(lumpBlock('iDeCo一時金（' + r.idecoLump.age + '歳で受取）', r.idecoLump, r.icYears, r.idecoLump.adjusted));
+    }
+    document.getElementById('lump').innerHTML = lumpRows.join('<div style="height:10px"></div>');
+
     // 警告
     var w = [];
     if (r.lockedYears > 0){
-      w.push('<b>iDeCoは' + IDECO_WITHDRAW_AGE + '歳まで引き出せません。</b>取り崩し開始が' + r.startAge
+      w.push('<b>iDeCoを受け取るのは' + r.icRecvAge + '歳です。</b>取り崩し開始が' + r.startAge
            + '歳のため、最初の' + r.lockedYears + '年間は証券口座だけで取り崩す計算にしています。');
+    }
+    if (r.sevPastDone){
+      w.push('退職金の受取年齢が現在の年齢より前のため、<b>すでに受け取り済み</b>とみなし、資産には加算していません（証券口座の残高に含めてください）。');
+    }
+    if (r.adjustSev){
+      w.push('<b>iDeCoを先に受け取り、' + (-(r.icRecvAge - readParams().sevRecvAge)) + '年後に退職金を受け取る想定です。</b>'
+           + '令和8年以降は10年空けないと退職所得控除が重複調整されるため、退職金側の控除を' + r.overlap + '年分減らしています。');
+    }
+    if (r.adjustIdeco){
+      w.push('<b>退職金を先に受け取り、' + (r.icRecvAge - readParams().sevRecvAge) + '年後にiDeCoを受け取る想定です。</b>'
+           + 'この順序は15年空ける必要があるため、iDeCo側の控除を' + r.overlap + '年分減らしています。');
     }
     if (r.idecoContribStopped){
       w.push('iDeCoの拠出は<b>' + IDECO_CONTRIB_END_AGE + '歳未満まで</b>として計算しています（それ以降は運用のみ）。');
@@ -505,8 +672,10 @@ function calc(p){
     document.getElementById('notes').innerHTML = [
       '・積立期の生活費と追加投資は勤労収入で賄う前提です。証券口座の配当（税引後）はその年に使い切る想定で、資産には積み上げていません',
       '・iDeCoは分配金が自動再投資され運用益も非課税のため、配当利回り＋成長率のトータルリターン（' + (r.R*100).toFixed(1) + '%）で複利運用します',
-      '・取り崩し期は証券口座も配当を再投資したうえで、両口座から残高比で取り崩します（' + IDECO_WITHDRAW_AGE + '歳未満の期間はiDeCoを除外）',
-      '・証券口座の取り崩しは<b>含み益の割合にのみ' + num('t').toFixed(3) + '%課税</b>し、税引後の手取りを収入としています。iDeCoの受取は退職所得控除・公的年金等控除が使えるため、ここでは非課税として扱っています（実際の税額は受取方法で変わります）',
+      '・取り崩し期は証券口座も配当を再投資したうえで運用を続け、そこから取り崩します。iDeCoは' + r.icRecvAge + '歳で一時金として受け取り、税引後の額を証券口座に移す想定です',
+      '・iDeCo・退職金の一時金は<b>退職所得</b>として、拠出年数・勤続年数に応じた退職所得控除を差し引き、超過分の1/2に所得税（復興特別所得税込み）と住民税10%を課しています。年金形式で受け取る場合は公的年金等控除の対象となり、税額は変わります',
+      '・退職金とiDeCoを近い年に受け取ると控除枠の重複調整が入ります。iDeCoが先なら10年（令和8年以降）、退職金が先なら15年空ける必要があり、本ツールも重複期間分の控除を差し引いて計算しています',
+      '・証券口座の取り崩しは<b>含み益の割合にのみ' + pct(num('t')) + '%課税</b>し、税引後の手取りを収入としています',
       '・年金額・生活費目標は税引後（手取り）の金額として扱っています。年金は公的年金等控除により低額であれば概ね非課税です',
       '・インフレ調整はしていません。すべて現在の物価水準での金額です（本来の「4%ルール」は毎年インフレ率だけ取り崩し額を増やす手法で、本ツールの定額取り崩しとは異なります）',
       '・年金額・生活費はあくまで仮の数字です。ねんきん定期便の見込み額や実際の生活費に置き換えて調整してください',
