@@ -11,13 +11,17 @@ catawiki Seller の Orders レポート（.xlsx）から月次売上を集計し
 | 計上日 | `Order date`（落札・注文成立日） |
 | 通貨 | EUR建て |
 | 除外 | `Cancellation date` があるキャンセル取引（`Order date` が空） |
-| 手数料 | `Commission (incl. VAT)` は控除せず、別資料で費用計上（明細に参考表示） |
+| 手数料 | `Commission (incl. VAT)` は売上から控除せず、支払手数料として別仕訳で計上 |
 | 円換算 | 取引ごとに `Order date` のEUR/JPYレートで換算、円未満四捨五入 |
 | 仕訳 | 月次1本、各月末日付 |
 
 ## 仕訳パターン
 
-借）売掛金［catawiki］対象外 ／ 貸）売上高［catawiki］輸出売上 0%
+- 売上: 借）売掛金［catawiki］対象外 ／ 貸）売上高［catawiki］輸出売上 0%
+- 手数料: 借）支払手数料［catawiki］対象外 ／ 貸）売掛金［catawiki］対象外
+
+手数料の税区分は、MFの支払手数料の補助科目 `catawiki` に設定された既定値（対象外）に合わせている。
+eBay（支払手数料［ebay］課税仕入 10%・適格請求書あり）とは扱いが異なる点に注意。
 
 ## 為替レート
 
